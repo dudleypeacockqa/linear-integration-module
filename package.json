@@ -1,0 +1,55 @@
+{
+  "name": "@flocommand/linear-integration",
+  "version": "1.0.0",
+  "description": "Reusable Linear integration module for OAuth authentication, webhook handling, and fault/error management",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "linear-setup": "./dist/cli/setup.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint src --ext .ts",
+    "prepublishOnly": "npm run build",
+    "setup": "node dist/cli/setup.js"
+  },
+  "keywords": [
+    "linear",
+    "oauth",
+    "webhook",
+    "fault-management",
+    "error-tracking",
+    "issue-tracker",
+    "claude-code",
+    "cursor",
+    "mcp"
+  ],
+  "author": "FloCommand",
+  "license": "MIT",
+  "dependencies": {
+    "@linear/sdk": "^25.0.0",
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "open": "^9.1.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.10.0",
+    "typescript": "^5.3.0",
+    "vitest": "^1.0.0",
+    "@vitest/coverage-v8": "^1.0.0",
+    "eslint": "^8.55.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dudleypeacockqa/linear-integration-module.git"
+  }
+}
