@@ -1,308 +1,222 @@
 # Linear Integration Module
 
-A reusable module for integrating [Linear](https://linear.app) into any application. Supports OAuth 2.0 authentication, webhook handling, and fault/error management.
+A standardized, reusable module for integrating Linear into your applications. Supports OAuth authentication, webhooks, and automatic fault/error reporting with deduplication.
 
 ## Features
 
-- **OAuth 2.0 Authentication** with PKCE support
-- **Webhook Handler** for real-time event processing
-- **Fault Management** for automatic error reporting to Linear
-- **CLI Setup Tool** for easy configuration
-- **TypeScript Support** with full type definitions
-- **Express Middleware** for webhook endpoints
-
-## Installation
-
-```bash
-npm install @flocommand/linear-integration
-```
+- **OAuth 2.0 with PKCE** - Secure authentication flow for Linear
+- **Webhook Handler** - Process Linear events (Issue, Comment, Project, Cycle)
+- **Fault Manager** - Automatic error reporting to Linear with deduplication
+- **Multi-Language** - TypeScript/Node.js and Python/FastAPI implementations
+- **Production Ready** - Used in FloCommand and other production applications
 
 ## Quick Start
 
-### 1. Create a Linear OAuth Application
-
-1. Go to [Linear Settings > API](https://linear.app/settings/api)
-2. Click "New OAuth application"
-3. Fill in your application details:
-   - **Application name**: Your app name (e.g., "FloCommand", "Claude Code")
-   - **Developer name**: Your name or company
-   - **Callback URLs**: `http://localhost:3847/auth/callback` (for development)
-4. Save the **Client ID** and **Client Secret**
-
-### 2. Run the Setup CLI
+### Installation
 
 ```bash
-npx @flocommand/linear-integration setup
+# Clone the repository
+git clone https://github.com/dudleypeacockqa/linear-integration-module.git
+
+# TypeScript
+cd linear-integration-module
+npm install
+
+# Python
+cd linear-integration-module/python
+pip install -r requirements.txt
 ```
 
-This will guide you through the OAuth flow and save your tokens to `.env.linear`.
+### Environment Variables
 
-### 3. Use in Your Application
+```bash
+# Required
+LINEAR_API_KEY=lin_api_xxxxxxxx
+LINEAR_DEFAULT_TEAM_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 
-```typescript
-import { LinearClient } from '@flocommand/linear-integration';
+# OAuth
+LINEAR_CLIENT_ID=xxxxxxxx
+LINEAR_CLIENT_SECRET=xxxxxxxx
+LINEAR_REDIRECT_URI=https://your-backend.com/api/auth/linear/callback
 
-const client = new LinearClient({
-  accessToken: process.env.LINEAR_ACCESS_TOKEN,
-  faults: {
-    teamId: 'YOUR_TEAM_ID',
-    appName: 'MyApp',
-    environment: 'production',
-  },
-});
+# Webhooks
+LINEAR_WEBHOOK_SECRET=lin_wh_xxxxxxxx
 
-// Report an error
-try {
-  await riskyOperation();
-} catch (error) {
-  await client.reportError(error, {
-    userId: currentUser.id,
-    action: 'riskyOperation',
-  });
-}
+# Optional
+LINEAR_APP_NAME=YourAppName
+LINEAR_BUG_LABEL_ID=xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
 ```
 
-## API Reference
+## Usage
 
-### LinearClient
+### Python/FastAPI
 
-The main client that combines OAuth, webhooks, and fault management.
+```python
+from fastapi import FastAPI
+from python import oauth_router, webhooks_router, report_error, on_event
 
-```typescript
-const client = new LinearClient({
-  // Authentication (choose one)
-  apiKey: 'lin_api_xxx',           // API key
-  accessToken: 'oauth_token',       // OAuth access token
-  
-  // OAuth configuration (for auth flows)
-  oauth: {
-    clientId: 'xxx',
-    clientSecret: 'xxx',
-    redirectUri: 'http://localhost:3000/callback',
-  },
-  
-  // Webhook configuration
-  webhook: {
-    signingSecret: 'webhook_secret',
-  },
-  
-  // Fault management configuration
-  faults: {
-    teamId: 'team_xxx',
-    appName: 'MyApp',
-    environment: 'production',
-    defaultPriority: 2,
-    labelIds: ['label_xxx'],
-    deduplicate: true,
-    dedupeWindow: 3600000, // 1 hour
-  },
-});
+app = FastAPI()
+
+# Register routes (before auth middleware)
+app.include_router(oauth_router, prefix="/api")
+app.include_router(webhooks_router, prefix="/api")
+
+# Custom webhook handler
+@on_event("Issue.create")
+async def handle_issue_created(payload):
+    print(f"Issue created: {payload.data}")
+
+# Error reporting
+try:
+    do_something()
+except Exception as e:
+    await report_error(e, user_id="user_123", url="/api/endpoint")
 ```
 
-### OAuth Authentication
+### TypeScript/Express
 
 ```typescript
-import { LinearAuthClient } from '@flocommand/linear-integration';
-
-const auth = new LinearAuthClient({
-  clientId: 'xxx',
-  clientSecret: 'xxx',
-  redirectUri: 'http://localhost:3000/callback',
-  scopes: ['read', 'write', 'issues:create'],
-});
-
-// Generate PKCE challenge (recommended)
-const pkce = auth.generatePKCE();
-const state = auth.generateState();
-
-// Get authorization URL
-const authUrl = auth.getAuthorizationUrl({ state, pkce });
-
-// Exchange code for token
-const tokens = await auth.exchangeCode(code, pkce.codeVerifier);
-
-// Refresh token
-const newTokens = await auth.refreshToken(tokens.refresh_token);
-```
-
-### Webhook Handling
-
-```typescript
-import { LinearWebhookHandler, createWebhookMiddleware } from '@flocommand/linear-integration';
 import express from 'express';
+import { linearOAuthRouter, linearWebhooksRouter, reportError } from './src';
 
-const webhookHandler = new LinearWebhookHandler({
-  signingSecret: process.env.LINEAR_WEBHOOK_SECRET,
-});
-
-// Register event handlers
-webhookHandler.on('Issue', (event) => {
-  console.log(`Issue ${event.action}:`, event.data);
-});
-
-webhookHandler.on('Issue.create', (event) => {
-  console.log('New issue created:', event.data);
-});
-
-webhookHandler.onAny((event) => {
-  console.log(`Event: ${event.type}.${event.action}`);
-});
-
-// Express middleware
 const app = express();
-app.use(express.json());
-app.post('/webhooks/linear', createWebhookMiddleware({ handler: webhookHandler }));
-```
 
-### Fault Management
+// Register routes (before auth middleware)
+app.use('/api', linearOAuthRouter);
+app.use('/api', linearWebhooksRouter);
 
-```typescript
-import { FaultManager } from '@flocommand/linear-integration';
-
-const faults = new FaultManager({
-  accessToken: process.env.LINEAR_ACCESS_TOKEN,
-  teamId: 'team_xxx',
-  appName: 'MyApp',
-  environment: 'production',
-  defaultPriority: 2, // High
-  deduplicate: true,
-});
-
-// Report a fault
-const result = await faults.report({
-  message: 'Database connection failed',
-  severity: 'critical',
-  stack: error.stack,
-  context: { database: 'primary', retry: 3 },
-  url: '/api/users',
-  userId: 'user_123',
-});
-
-console.log(`Created issue: ${result.identifier}`);
-
-// Report an Error object
-await faults.reportError(error, { context: 'additional info' });
-
-// Global error handler
-process.on('uncaughtException', faults.createGlobalHandler());
-
-// Express error middleware
-app.use(faults.expressErrorHandler());
-```
-
-## Environment Variables
-
-```bash
-# OAuth Configuration
-LINEAR_CLIENT_ID=your_client_id
-LINEAR_CLIENT_SECRET=your_client_secret
-LINEAR_REDIRECT_URI=http://localhost:3000/callback
-
-# API Key (alternative to OAuth)
-LINEAR_API_KEY=lin_api_xxx
-
-# Access Token (from OAuth flow)
-LINEAR_ACCESS_TOKEN=xxx
-
-# Webhook
-LINEAR_WEBHOOK_SECRET=xxx
-
-# Fault Management
-LINEAR_DEFAULT_TEAM_ID=team_xxx
-```
-
-## Integration Examples
-
-### Claude Code / Cursor Integration
-
-Create a `.env` file with your Linear credentials and use the fault manager to report errors:
-
-```typescript
-// error-handler.ts
-import { FaultManager } from '@flocommand/linear-integration';
-
-export const linearFaults = new FaultManager({
-  accessToken: process.env.LINEAR_ACCESS_TOKEN!,
-  teamId: process.env.LINEAR_DEFAULT_TEAM_ID!,
-  appName: 'Claude Code',
-  environment: process.env.NODE_ENV || 'development',
-});
-
-// Use in your application
+// Error reporting
 try {
-  // ... code
+    doSomething();
 } catch (error) {
-  await linearFaults.reportError(error as Error);
+    await reportError(error, { userId: 'user_123', url: '/api/endpoint' });
 }
 ```
 
-### FloCommand Integration
+## API Endpoints
 
-```typescript
-import { LinearClient } from '@flocommand/linear-integration';
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/api/auth/linear` | GET | Initiate OAuth flow |
+| `/api/auth/linear/callback` | GET | OAuth callback (PKCE) |
+| `/api/auth/linear/status` | GET | Check OAuth configuration |
+| `/api/webhooks/linear` | POST | Receive Linear webhook events |
+| `/api/webhooks/linear/health` | GET | Webhook health check |
 
-const linear = new LinearClient({
-  accessToken: process.env.LINEAR_ACCESS_TOKEN,
-  faults: {
-    teamId: process.env.LINEAR_DEFAULT_TEAM_ID!,
-    appName: 'FloCommand',
-    environment: process.env.NODE_ENV,
-    labelIds: [process.env.LINEAR_BUG_LABEL_ID!],
-  },
-});
+## Setup Guide
 
-// Create issue
-await linear.createIssue({
-  title: 'New feature request',
-  description: 'Description here',
-  teamId: 'team_xxx',
-  priority: 3,
-});
+### 1. Create Linear OAuth Application
 
-// Report fault
-await linear.reportFault({
-  message: 'API rate limit exceeded',
-  severity: 'warning',
-  context: { endpoint: '/api/proposals', limit: 100 },
-});
+1. Go to [Linear Settings > API > OAuth Applications](https://linear.app/settings/api)
+2. Create new application with redirect URL: `https://your-backend.com/api/auth/linear/callback`
+3. Note the Client ID and Client Secret
+
+### 2. Get Team ID
+
+```bash
+curl -X POST https://api.linear.app/graphql \
+  -H "Authorization: YOUR_LINEAR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ teams { nodes { id name } } }"}'
 ```
 
-### Webhook Server for Error Notifications
+### 3. Create Webhook
 
-```typescript
-import { LinearWebhookHandler, createWebhookServer } from '@flocommand/linear-integration';
+1. Go to [Linear Settings > API > Webhooks](https://linear.app/settings/api)
+2. Create webhook with URL: `https://your-backend.com/api/webhooks/linear`
+3. Select events: Issue, Comment, Project
+4. Note the Signing Secret
 
-const handler = new LinearWebhookHandler({
-  signingSecret: process.env.LINEAR_WEBHOOK_SECRET,
-});
+### 4. Configure Environment
 
-// Listen for issue status changes
-handler.on('Issue.update', async (event) => {
-  const issue = event.data as any;
-  if (issue.state?.name === 'Done') {
-    console.log(`Issue ${issue.identifier} completed!`);
-    // Send notification, update dashboard, etc.
-  }
-});
+Set all `LINEAR_*` environment variables in your deployment platform.
 
-// Start webhook server
-await createWebhookServer(handler, 3001);
+## Fault Reporting
+
+The fault manager automatically:
+- Creates Linear issues for errors
+- Deduplicates within 1-hour window
+- Adds comments for duplicate occurrences
+- Maps severity to Linear priority
+
+### Priority Mapping
+
+| Severity | Linear Priority |
+|----------|-----------------|
+| critical | 1 (Urgent) |
+| error | 2 (High) |
+| warning | 3 (Normal) |
+
+### Error Format
+
+```markdown
+## Error Details
+**Message:** Error message
+**Severity:** error
+**Environment:** production
+**Timestamp:** 2025-01-01T00:00:00Z
+**URL:** /api/endpoint
+**User ID:** user_123
+
+## Stack Trace
+```
+Traceback...
 ```
 
-## MCP Server Configuration
+## Context
+```json
+{"action": "POST /api/endpoint"}
+```
+```
 
-To use with Claude Code's Linear MCP server, you'll need to authenticate first:
+## Documentation
 
-1. Run the setup CLI: `npx @flocommand/linear-integration setup`
-2. Copy the access token from `.env.linear`
-3. Configure your MCP server with the token
+- [Setup Guide](docs/SETUP_GUIDE.md) - Complete setup instructions
+- [Environment Template](docs/ENV_TEMPLATE.md) - Environment variables reference
+- [API Reference](docs/API_REFERENCE.md) - Endpoint and function documentation
+
+## Project Structure
+
+```
+linear-integration-module/
+├── src/                    # TypeScript implementation
+│   ├── auth/               # OAuth module
+│   ├── webhooks/           # Webhook handler
+│   ├── faults/             # Fault manager
+│   ├── cli/                # CLI tools
+│   └── tests/              # Tests
+├── python/                 # Python/FastAPI implementation
+│   ├── linear_oauth.py     # OAuth routes
+│   ├── linear_webhooks.py  # Webhook routes
+│   ├── linear_faults.py    # Fault manager
+│   └── requirements.txt    # Dependencies
+├── docs/                   # Documentation
+│   ├── SETUP_GUIDE.md
+│   ├── ENV_TEMPLATE.md
+│   └── API_REFERENCE.md
+└── examples/               # Example integrations
+```
 
 ## Testing
 
 ```bash
-npm test
-npm run test:coverage
+# Check OAuth status
+curl https://your-backend.com/api/auth/linear/status
+
+# Check webhook health
+curl https://your-backend.com/api/webhooks/linear/health
+
+# Test Linear API
+curl -X POST https://api.linear.app/graphql \
+  -H "Authorization: YOUR_LINEAR_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"query":"{ viewer { id name } }"}'
 ```
+
+## Used In
+
+- **FloCommand** - Sales proposal management platform
+- Works with Claude Code, Cursor, and other development tools
 
 ## License
 
@@ -310,4 +224,10 @@ MIT
 
 ## Contributing
 
-Contributions are welcome! Please read our contributing guidelines and submit pull requests to our repository.
+1. Fork the repository
+2. Create a feature branch
+3. Submit a pull request
+
+---
+
+**Repository**: https://github.com/dudleypeacockqa/linear-integration-module
